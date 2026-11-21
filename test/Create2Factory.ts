@@ -68,6 +68,32 @@ describe("VanityCreate2Factory: deployment and search compatibility", function (
     expect(domain.chainId).to.equal((await ethers.provider.getNetwork()).chainId);
   });
 
+  it("deploys the selected vanity salt at exactly 0xa11A111A3100DDe3224995982643CA592111AA11", async function () {
+    const f = await networkHelpers.loadFixture(factoryFixture);
+    const searchFactoryAddress = ethers.getAddress("0x66a8fbbdfcac14499fc30060c50fc7416d92063d");
+    const salt = "0x542c34d29cde4147af89e56f8063dd45450644a4d76bdce78729472ba8925af1";
+    const expectedAddress = "0xa11A111A3100DDe3224995982643CA592111AA11";
+    expect(f.initCodeHash).to.equal(reference.initCodeHash);
+    expect(ethers.getCreate2Address(searchFactoryAddress, salt, f.initCodeHash)).to.equal(expectedAddress);
+    expect(await ethers.provider.getCode(searchFactoryAddress)).to.equal("0x");
+    expect(await ethers.provider.getCode(expectedAddress)).to.equal("0x");
+
+    // Install the compiled factory runtime at the search address on the local EVM,
+    // retaining its test owner so this regression never needs the deployment key.
+    await networkHelpers.setCode(searchFactoryAddress, await ethers.provider.getCode(f.factoryAddress));
+    const searchFactory = await ethers.getContractAt("VanityCreate2Factory", searchFactoryAddress, f.owner);
+    expect(await searchFactory.owner()).to.equal(f.owner.address);
+    expect(await searchFactory.deploy.staticCall(salt, f.initCode)).to.equal(expectedAddress);
+    await expect(searchFactory.deploy(salt, f.initCode))
+      .to.emit(searchFactory, "Deployed").withArgs(expectedAddress, salt, reference.initCodeHash);
+
+    const token = await ethers.getContractAt("Token", expectedAddress);
+    expect(await ethers.provider.getCode(expectedAddress)).not.to.equal("0x");
+    expect(await token.totalSupply()).to.equal(f.totalSupply);
+    expect(await token.balanceOf(f.receiver)).to.equal(f.totalSupply);
+    expect((await token.eip712Domain()).verifyingContract).to.equal(expectedAddress);
+  });
+
   it("rejects other callers before creating code or accepting their value", async function () {
     const f = await networkHelpers.loadFixture(factoryFixture);
     await expect(f.factory.connect(f.other).deploy(f.salt, f.initCode, { value: 1n }))

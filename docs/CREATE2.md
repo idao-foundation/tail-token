@@ -99,9 +99,18 @@ The factory has no receive, fallback, withdrawal, or arbitrary-call function. Na
 
 On 2026-11-12, a fresh compilation matched the search input's creation bytecode and constructor arguments byte for byte, the saved session's full initialization code and hash, and all 24 saved results' hashes, addresses, and deployment calldata. An isolated local simulation recreated the session's nonce-zero factory and executed one saved calldata payload successfully, deploying at its saved address and minting the exact supply to the receiver above. No session keys or saved search-result files are included in this repository.
 
-The full local suite passes 143 tests, including 13 factory tests and 15 deployment-script tests. These cover hash compatibility, address prediction, deployment permissions, value forwarding, duplicate deployment, constructor errors, empty code, rollback, constructor reentry, fixed inputs, malformed salts, network/fork restrictions, signer identity, key validation/redaction, unused accounts, and complete local deployment. Automated tests use a synthetic signing key and verify that the shared deployment flow submits exactly two signed raw transactions without unlocked-account transactions or impersonation. The production entry point's fixed-wallet guard is tested separately.
+The full local suite passes 144 tests, including 14 factory tests and 15 deployment-script tests. These cover hash compatibility, address prediction, deployment permissions, value forwarding, duplicate deployment, constructor errors, empty code, rollback, constructor reentry, fixed inputs, malformed salts, network/fork restrictions, signer identity, key validation/redaction, unused accounts, and complete local deployment. Automated tests use a synthetic signing key and verify that the shared deployment flow submits exactly two signed raw transactions without unlocked-account transactions or impersonation. The production entry point's fixed-wallet guard is tested separately.
 
 On 2026-11-13, compilation and TypeScript checks also passed. The actual `npm run deploy:local` command loaded the configured environment key, asserted the fixed deployer, and used a saved salt to produce the matching saved token address. BSC RPC was deliberately unavailable during this check. The command also rejected a missing key before submitting transactions, and captured output was checked for key disclosure. See the [reentrancy review](../security/reentrancy-review.md) for the reviewed source fingerprints and external-call analysis. This is local validation, not evidence of a mainnet deployment.
+
+On 2026-11-21, the selected public salt/address pair was pinned in [Create2Factory.ts](../test/Create2Factory.ts):
+
+| Input or result | Value |
+| --- | --- |
+| Salt | `0x542c34d29cde4147af89e56f8063dd45450644a4d76bdce78729472ba8925af1` |
+| Token address | `0xa11A111A3100DDe3224995982643CA592111AA11` |
+
+The regression installs the compiled factory runtime at the public factory address on the local EVM, retaining the fixture's test owner, then executes CREATE2 with the selected salt and pinned Token initialization code. It checks the exact predicted address, return value, deployment event, deployed code, supply, receiver balance, and EIP-712 verifying contract without deployment credentials. A separate `npm run deploy:local` run used the asserted environment signing key to create the nonce-zero factory and deploy Token at the same exact address, with BSC RPC unavailable. Compilation, all 144 tests, and TypeScript checks passed; the automated checks were run with an empty `BSC_PRIVATE_KEY`, and the signed dry-run output was checked for key disclosure.
 
 ```sh
 npm run compile

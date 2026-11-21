@@ -53,7 +53,7 @@ Use Node.js from `.nvmrc` and npm with `package-lock.json`. Read dependency vers
 - Both deployment modes load `BSC_PRIVATE_KEY` from the environment or ignored `.env`, derive its wallet address, and assert the fixed search deployer before connecting to the network. Use an ethers Wallet to sign both transactions; never impersonate or depend on unlocked node accounts. Reject missing, malformed, invalid, or mismatched keys without exposing their contents in errors or logs.
 - The local dry run uses a fresh, non-forked `local` EDR network (chain ID `31337`) and funds the validated signing wallet with simulated native currency. It needs the private key but no BSC RPC configuration. Never read a search-session file to obtain the key. The live path requires `bsc` HTTP chain ID `56`. Both paths reject a previously used deployer or occupied target addresses without resetting their state, then use transaction nonces zero and one.
 - Automated tests must use synthetic signing keys and remain independent of deployment secrets. Test the production identity guard separately from the shared signed-transaction flow, and verify that deployment sends signed raw transactions without impersonation.
-- Session files contain private keys. Do not copy them or saved search results into repository files or print their secret fields during verification.
+- Session files contain private keys. Do not copy session files, private keys, or bulk search results into repository files or print their secret fields during verification. An explicitly selected public salt/address pair may be pinned in a regression test.
 
 ## Mandatory contract, interface, and documentation synchronization
 
