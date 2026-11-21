@@ -113,6 +113,8 @@ Known development-tool advisories remain open and are recorded in the [dependenc
 
 The deployment script fixes the supply at **100,000,000 TAIL**, the receiver at `0x631a52566152799DB3cffb5432F9d1d60Dc91c8d`, and the deployer at the search session's public wallet address. It checks the exact `initCodeHash` before any deployment. The only variable deployment input is `CREATE2_SALT`: `0x` followed by the 64 hexadecimal digits produced by the search.
 
+Deployment uses fixed gas limits of **350,000** for the factory and **3,000,000** for Token (**3,350,000 total**), with no `eth_estimateGas` calls. The selected-salt local deployment consumed **2,220,579 gas** in total. Both transactions retain at least 50% headroom in regression tests. See the [gas measurements and validation](docs/CREATE2.md#fixed-gas-budgets); the script reports actual receipt usage after deployment.
+
 ### Local dry run
 
 Set `BSC_PRIVATE_KEY` in your environment or an ignored `.env` file based on [.env.example](.env.example). Both deployment modes derive its wallet address and require it to match the fixed search deployer before connecting to the network.

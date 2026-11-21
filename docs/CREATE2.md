@@ -65,6 +65,22 @@ This sends two real transactions. The script requires the `bsc` HTTP network and
 
 The factory creation transaction explicitly uses nonce zero. After checking its address and owner, the script signs the call to `deploy(salt, initCode)` with zero native value and wallet nonce one, then verifies deployed code, 100 million TAIL total supply, the receiver's full balance, 18 decimals, and the EIP-712 verifying contract and chain ID. The local EIP-712 domain uses `31337`; the mainnet domain uses `56`.
 
+## Fixed gas budgets
+
+Both transactions explicitly set `gasLimit`; the script never requests `eth_estimateGas`. Gas prices remain provider-supplied. The following receipt measurements were reproduced on 2026-11-21 using the selected vanity salt, pinned initialization code, and a fresh non-forked local Cancun EVM:
+
+| Transaction | Measured gas used | Fixed gas limit | Surplus |
+| --- | ---: | ---: | ---: |
+| Factory creation, nonce 0 | 223,118 | 350,000 | 56.9% |
+| Token CREATE2 deployment, nonce 1 | 1,997,461 | 3,000,000 | 50.2% |
+| Total | 2,220,579 | 3,350,000 | 50.9% |
+
+The limits include transaction overhead, factory execution, constructor execution, and code deposit; the token limit covers the complete factory call. The surplus also covers CREATE2 gas forwarding overhead. These are measured local requirements and conservative transaction budgets, not a live-mainnet gas guarantee. Revalidate after changing code, compiler settings, dependencies, or applicable chain gas rules. The existing initialization-code hash guard remains enforced before either transaction.
+
+[Deployment.ts](../test/Deployment.ts) makes `eth_estimateGas` throw and still completes both signed transactions for zero, selected, and all-nonzero salts. It asserts exact transaction gas limits, successful receipts, correct deployment results, at least 50% headroom over gas used, and accurate reported totals. All-nonzero salts exercise the maximum salt calldata cost. Tests use a synthetic signing key. The script logs fixed limits and actual receipt usage and returns both as decimal strings in `gasLimits` and `gasUsed`.
+
+The wallet must have enough BNB to cover the transaction gas limits at the chosen fee caps. A mined failing transaction still consumes its nonce; fixed gas budgets address the tested out-of-gas risk, while the existing identity, hash, nonce, and occupancy guards remain necessary.
+
 ## Factory ABI
 
 The constructor is `constructor()`, nonpayable, and records its immediate caller as `owner`. The compiled factory ABI contains two callable functions, one event, and five custom errors. Token functions remain documented separately in [Token-ABI.md](Token-ABI.md) and [IToken.sol](../contracts/interfaces/IToken.sol).
@@ -99,7 +115,7 @@ The factory has no receive, fallback, withdrawal, or arbitrary-call function. Na
 
 On 2026-11-12, a fresh compilation matched the search input's creation bytecode and constructor arguments byte for byte, the saved session's full initialization code and hash, and all 24 saved results' hashes, addresses, and deployment calldata. An isolated local simulation recreated the session's nonce-zero factory and executed one saved calldata payload successfully, deploying at its saved address and minting the exact supply to the receiver above. No session keys or saved search-result files are included in this repository.
 
-The full local suite passes 144 tests, including 14 factory tests and 15 deployment-script tests. These cover hash compatibility, address prediction, deployment permissions, value forwarding, duplicate deployment, constructor errors, empty code, rollback, constructor reentry, fixed inputs, malformed salts, network/fork restrictions, signer identity, key validation/redaction, unused accounts, and complete local deployment. Automated tests use a synthetic signing key and verify that the shared deployment flow submits exactly two signed raw transactions without unlocked-account transactions or impersonation. The production entry point's fixed-wallet guard is tested separately.
+The full local suite passes 146 tests, including 14 factory tests and 17 deployment-script tests. These cover hash compatibility, address prediction, deployment permissions, value forwarding, duplicate deployment, constructor errors, empty code, rollback, constructor reentry, fixed inputs, malformed salts, network/fork restrictions, signer identity, key validation/redaction, unused accounts, and complete local deployment. Automated tests use a synthetic signing key and verify that the shared deployment flow submits exactly two signed raw transactions without unlocked-account transactions or impersonation. The production entry point's fixed-wallet guard is tested separately.
 
 On 2026-11-13, compilation and TypeScript checks also passed. The actual `npm run deploy:local` command loaded the configured environment key, asserted the fixed deployer, and used a saved salt to produce the matching saved token address. BSC RPC was deliberately unavailable during this check. The command also rejected a missing key before submitting transactions, and captured output was checked for key disclosure. See the [reentrancy review](../security/reentrancy-review.md) for the reviewed source fingerprints and external-call analysis. This is local validation, not evidence of a mainnet deployment.
 
@@ -110,7 +126,7 @@ On 2026-11-21, the selected public salt/address pair was pinned in [Create2Facto
 | Salt | `0x542c34d29cde4147af89e56f8063dd45450644a4d76bdce78729472ba8925af1` |
 | Token address | `0xa11A111A3100DDe3224995982643CA592111AA11` |
 
-The regression installs the compiled factory runtime at the public factory address on the local EVM, retaining the fixture's test owner, then executes CREATE2 with the selected salt and pinned Token initialization code. It checks the exact predicted address, return value, deployment event, deployed code, supply, receiver balance, and EIP-712 verifying contract without deployment credentials. A separate `npm run deploy:local` run used the asserted environment signing key to create the nonce-zero factory and deploy Token at the same exact address, with BSC RPC unavailable. Compilation, all 144 tests, and TypeScript checks passed; the automated checks were run with an empty `BSC_PRIVATE_KEY`, and the signed dry-run output was checked for key disclosure.
+The regression installs the compiled factory runtime at the public factory address on the local EVM, retaining the fixture's test owner, then executes CREATE2 with the selected salt and pinned Token initialization code. It checks the exact predicted address, return value, deployment event, deployed code, supply, receiver balance, and EIP-712 verifying contract without deployment credentials. A separate `npm run deploy:local` run used the asserted environment signing key to create the nonce-zero factory and deploy Token at the same exact address, with BSC RPC unavailable. Compilation, all 146 tests, and TypeScript checks passed; the automated checks were run with an empty `BSC_PRIVATE_KEY`, and the signed dry-run output was checked for key disclosure.
 
 ```sh
 npm run compile

@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { artifacts } from "hardhat";
 import {
   deployCreate2Token, deployWithWallet, deployerAddress, deploymentMode, expectedFactoryAddress,
-  expectedInitCodeHash, loadDeploymentWallet, parseSalt, prepareTokenDeployment, receiverInput, supplyInput,
+  expectedInitCodeHash, factoryGasLimit, tokenGasLimit, loadDeploymentWallet, parseSalt, prepareTokenDeployment, receiverInput, supplyInput,
 } from "../scripts/lib/create2-deployment.js";
 import { createContext } from "./helpers/token.js";
 
@@ -104,43 +104,70 @@ describe("Deployment script: fixed CREATE2 inputs and execution guards", functio
     expect(await ethers.provider.getBalance(testDeployer)).to.equal(0n);
   });
 
-  it("signs both local transactions with a real test key and reports the resulting addresses", async function () {
-    const logs: string[] = [];
-    const methods: string[] = [];
-    const provider = connection.provider;
-    const originalRequest = provider.request;
-    provider.request = async request => {
-      methods.push(request.method);
-      return originalRequest.call(provider, request);
-    };
-    let result: Awaited<ReturnType<typeof deployWithWallet>>;
-    try {
-      result = await deployWithWallet(connection, salt, testWallet, message => logs.push(message));
-    } finally {
-      provider.request = originalRequest;
-    }
-    expect(methods.filter(method => method === "eth_sendRawTransaction")).to.have.length(2);
-    expect(methods).not.to.include("eth_sendTransaction");
-    expect(methods).not.to.include("hardhat_impersonateAccount");
-    expect(methods).not.to.include("hardhat_stopImpersonatingAccount");
-    expect(result.dryRun).to.equal(true);
-    expect(result.chainId).to.equal(31337);
-    expect(result.deployer).to.equal(testDeployer);
-    expect(result.factory).to.equal(testFactoryAddress);
-    expect(result.address).to.equal(tokenAddress);
-    expect(result.initCodeHash).to.equal(expectedInitCodeHash);
-    const factory = await ethers.getContractAt("VanityCreate2Factory", result.factory);
-    const token = await ethers.getContractAt("Token", result.address);
-    expect(await factory.owner()).to.equal(testDeployer);
-    expect(await token.balanceOf(receiverInput)).to.equal(ethers.parseUnits("100000000", 18));
-    expect(await token.totalSupply()).to.equal(ethers.parseUnits("100000000", 18));
-    expect((await ethers.provider.getTransaction(result.factoryTransaction))!.nonce).to.equal(0);
-    expect((await ethers.provider.getTransaction(result.tokenTransaction))!.nonce).to.equal(1);
-    expect(logs).to.include(`Initialization-code hash verified: ${expectedInitCodeHash}`);
-    expect(logs).to.include(`Factory deployed: ${testFactoryAddress}`);
-    expect(logs).to.include(`Token deployed: ${tokenAddress}`);
-    expect(logs.join("\n")).not.to.include(testWallet.privateKey);
-  });
+  for (const [label, deploymentSalt] of [
+    ["zero salt", ethers.ZeroHash],
+    ["selected vanity salt", "0x542c34d29cde4147af89e56f8063dd45450644a4d76bdce78729472ba8925af1"],
+    ["all-nonzero salt", "0x" + "ff".repeat(32)],
+  ] as const) {
+    it(`deploys with fixed gas limits and no estimation for ${label}`, async function () {
+      const tokenAddress = ethers.getCreate2Address(testFactoryAddress, deploymentSalt, expectedInitCodeHash);
+      const logs: string[] = [];
+      const methods: string[] = [];
+      const provider = connection.provider;
+      const originalRequest = provider.request;
+      provider.request = async request => {
+        methods.push(request.method);
+        if (request.method === "eth_estimateGas") throw new Error("Deployment must not estimate gas");
+        return originalRequest.call(provider, request);
+      };
+      let result: Awaited<ReturnType<typeof deployWithWallet>>;
+      try {
+        result = await deployWithWallet(connection, deploymentSalt, testWallet, message => logs.push(message));
+      } finally {
+        provider.request = originalRequest;
+      }
+      expect(methods.filter(method => method === "eth_sendRawTransaction")).to.have.length(2);
+      expect(methods).not.to.include("eth_sendTransaction");
+      expect(methods).not.to.include("eth_estimateGas");
+      expect(methods).not.to.include("hardhat_impersonateAccount");
+      expect(methods).not.to.include("hardhat_stopImpersonatingAccount");
+      expect(result.dryRun).to.equal(true);
+      expect(result.chainId).to.equal(31337);
+      expect(result.deployer).to.equal(testDeployer);
+      expect(result.factory).to.equal(testFactoryAddress);
+      expect(result.address).to.equal(tokenAddress);
+      expect(result.initCodeHash).to.equal(expectedInitCodeHash);
+      const factory = await ethers.getContractAt("VanityCreate2Factory", result.factory);
+      const token = await ethers.getContractAt("Token", result.address);
+      expect(await factory.owner()).to.equal(testDeployer);
+      expect(await token.balanceOf(receiverInput)).to.equal(ethers.parseUnits("100000000", 18));
+      expect(await token.totalSupply()).to.equal(ethers.parseUnits("100000000", 18));
+      expect((await ethers.provider.getTransaction(result.factoryTransaction))!.nonce).to.equal(0);
+      expect((await ethers.provider.getTransaction(result.tokenTransaction))!.nonce).to.equal(1);
+      expect(logs).to.include(`Initialization-code hash verified: ${expectedInitCodeHash}`);
+      expect(logs).to.include(`Factory deployed: ${testFactoryAddress}`);
+      expect(logs).to.include(`Token deployed: ${tokenAddress}`);
+      expect(logs.join("\n")).not.to.include(testWallet.privateKey);
+      expect(factoryGasLimit).to.equal(350_000n);
+      expect(tokenGasLimit).to.equal(3_000_000n);
+      const factoryTx = (await ethers.provider.getTransaction(result.factoryTransaction))!;
+      const tokenTx = (await ethers.provider.getTransaction(result.tokenTransaction))!;
+      const factoryReceipt = (await ethers.provider.getTransactionReceipt(result.factoryTransaction))!;
+      const tokenReceipt = (await ethers.provider.getTransactionReceipt(result.tokenTransaction))!;
+      expect(factoryTx.gasLimit).to.equal(factoryGasLimit);
+      expect(tokenTx.gasLimit).to.equal(tokenGasLimit);
+      expect(factoryReceipt.status).to.equal(1);
+      expect(tokenReceipt.status).to.equal(1);
+      // Preserve at least 50% headroom, including the most expensive salt calldata.
+      expect(factoryGasLimit * 2n).to.be.at.least(factoryReceipt.gasUsed * 3n);
+      expect(tokenGasLimit * 2n).to.be.at.least(tokenReceipt.gasUsed * 3n);
+      expect(result.gasLimits).to.deep.equal({ factory: "350000", token: "3000000", total: "3350000" });
+      expect(result.gasUsed).to.deep.equal({
+        factory: factoryReceipt.gasUsed.toString(), token: tokenReceipt.gasUsed.toString(),
+        total: (factoryReceipt.gasUsed + tokenReceipt.gasUsed).toString(),
+      });
+    });
+  }
 
   it("refuses a previously used wallet without resetting its nonce or funding it", async function () {
     await networkHelpers.setNonce(testDeployer, 1);

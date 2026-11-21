@@ -10,6 +10,11 @@ export const deployerAddress = getAddress("0xf7c70402a270e444ef5e1325eb9af8f1aef
 export const expectedInitCodeHash = "0xbcaaceb0c490365b2a3f3bebb7a4b2127bd30e11fb48a3f6132cc0e993abb0cc";
 export const expectedFactoryAddress = getCreateAddress({ from: deployerAddress, nonce: 0 });
 
+// Local Cancun receipts: factory 223,118; selected-salt token 1,997,461 gas.
+// Rounded budgets retain at least 50% headroom; tests reject eth_estimateGas calls.
+export const factoryGasLimit = 350_000n;
+export const tokenGasLimit = 3_000_000n;
+
 /** Loads the signing key from the environment and verifies the pinned search wallet without exposing key material. */
 export function loadDeploymentWallet(): Wallet {
   const privateKey = process.env.BSC_PRIVATE_KEY;
@@ -125,21 +130,27 @@ export async function deployWithWallet(
     log("Funded the signing wallet with 100 simulated BNB on the local network.");
   }
   const signer = wallet.connect(ethers.provider);
+  log(`Fixed gas limits: factory ${factoryGasLimit}, token ${tokenGasLimit}, total ${factoryGasLimit + tokenGasLimit}`);
 
   log("Deploying VanityCreate2Factory at wallet nonce 0...");
-  const factory = await (await ethers.getContractFactory("VanityCreate2Factory", signer)).deploy({ nonce: 0 });
+  const factory = await (await ethers.getContractFactory("VanityCreate2Factory", signer)).deploy({ nonce: 0, gasLimit: factoryGasLimit });
   const factoryTransaction = factory.deploymentTransaction()!;
   log(`Factory transaction submitted: ${factoryTransaction.hash}`);
   await factory.waitForDeployment();
+  const factoryReceipt = await factoryTransaction.wait();
+  if (!factoryReceipt || factoryReceipt.status !== 1) throw new Error("Factory deployment did not succeed.");
   if (await factory.getAddress() !== factoryAddress || await factory.owner() !== deployer) {
     throw new Error("Deployed factory address or owner does not match the signing wallet.");
   }
   log(`Factory deployed: ${factoryAddress}`);
 
   log("Deploying Token through CREATE2 with zero native value at wallet nonce 1...");
-  const tokenTransaction = await factory.deploy(salt, initCode, { value: 0n, nonce: 1 });
+  const tokenTransaction = await factory.deploy(salt, initCode, { value: 0n, nonce: 1, gasLimit: tokenGasLimit });
   log(`Token transaction submitted: ${tokenTransaction.hash}`);
-  await tokenTransaction.wait();
+  const tokenReceipt = await tokenTransaction.wait();
+  if (!tokenReceipt || tokenReceipt.status !== 1) throw new Error("Token deployment did not succeed.");
+  const totalGasUsed = factoryReceipt.gasUsed + tokenReceipt.gasUsed;
+  log(`Gas used: factory ${factoryReceipt.gasUsed}, token ${tokenReceipt.gasUsed}, total ${totalGasUsed}`);
   const token = await ethers.getContractAt("Token", address);
   const [code, supply, receiverBalance, decimals, domain] = await Promise.all([
     ethers.provider.getCode(address), token.totalSupply(), token.balanceOf(receiver), token.decimals(), token.eip712Domain(),
@@ -156,5 +167,7 @@ export async function deployWithWallet(
     deployer, factory: factoryAddress, address,
     salt, initCodeHash, receiver, totalSupply: totalSupply.toString(), decimals: 18,
     factoryTransaction: factoryTransaction.hash, tokenTransaction: tokenTransaction.hash,
+    gasLimits: { factory: factoryGasLimit.toString(), token: tokenGasLimit.toString(), total: (factoryGasLimit + tokenGasLimit).toString() },
+    gasUsed: { factory: factoryReceipt.gasUsed.toString(), token: tokenReceipt.gasUsed.toString(), total: totalGasUsed.toString() },
   };
 }

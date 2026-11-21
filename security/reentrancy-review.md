@@ -2,7 +2,7 @@
 
 Reviewed on 2026-11-13 against the source hashes below, OpenZeppelin Contracts 5.6.1, and Solidity 0.8.38 with Cancun and optimization at 200 runs.
 
-Validation and the changed test fingerprint were refreshed on 2026-11-21 for the selected vanity-address regression. Production source fingerprints are unchanged; the factory's authorization-before-CREATE2 reasoning was rechecked for the additional test.
+Validation and deployment-script and test fingerprints were refreshed on 2026-11-21 for the selected vanity-address regression and fixed gas budgets. Contract source fingerprints are unchanged; the factory's authorization-before-CREATE2 reasoning was rechecked for the additional test.
 
 No exploitable token-side or factory-side reentrancy issue was identified in the reviewed implementation. This conclusion is based on source inspection and the local adversarial tests described below; it is not a formal proof.
 
@@ -54,7 +54,7 @@ The factory's ownership grants no authority over Token. Token initialization onl
 
 ## Validation
 
-The complete local suite passes **144 tests**, including **24 adversarial token reentrancy tests** in [Reentrancy.ts](../test/Reentrancy.ts), **14 factory tests** in [Create2Factory.ts](../test/Create2Factory.ts), and **15 deployment-script tests** in [Deployment.ts](../test/Deployment.ts). The hostile contracts are in [ReentrancyMocks.sol](../contracts/mocks/ReentrancyMocks.sol) and [Create2Mocks.sol](../contracts/mocks/Create2Mocks.sol).
+The complete local suite passes **146 tests**, including **24 adversarial token reentrancy tests** in [Reentrancy.ts](../test/Reentrancy.ts), **14 factory tests** in [Create2Factory.ts](../test/Create2Factory.ts), and **17 deployment-script tests** in [Deployment.ts](../test/Deployment.ts). The hostile contracts are in [ReentrancyMocks.sol](../contracts/mocks/ReentrancyMocks.sol) and [Create2Mocks.sol](../contracts/mocks/Create2Mocks.sol).
 
 | Adversarial cases | Count | Verified behavior |
 | --- | --- | --- |
@@ -73,9 +73,11 @@ The selected vanity-address regression executes CREATE2 at the public factory ad
 
 The deployment-script tests verify fixed constructor inputs, exact initialization-code hashing, salt format, permitted networks, fork rejection, signer identity, key validation/redaction, unused account checks, and the complete two-transaction local flow. Both modes load an environment key into an ethers Wallet and assert the fixed deployer before network connection. Library key-validation errors are replaced with messages that contain no key material. The script's hash and account-state checks run before any transaction. Local funding is confined to non-forked EDR; both modes sign raw transactions at wallet nonces zero and one. The BSC path also checks chain ID `56`.
 
+The deployment implementation now sets explicit gas limits of 350,000 and 3,000,000, checks successful receipts, and reports measured usage. This changes transaction budgeting and receipt handling only; token/factory bytecode, immutable-owner checks, CREATE2 forwarding, and callback state ordering are unchanged. All 146 local tests, compilation, and TypeScript checks passed. Three signed deployment tests reject `eth_estimateGas` calls and verify successful deployments with at least 50% gas headroom for zero, selected, and all-nonzero salts. The selected-salt local signed run consumed 223,118 and 1,997,461 gas, respectively.
+
 Automated signing tests use a synthetic key and exercise the shared deployment flow without deployment credentials. They observe two `eth_sendRawTransaction` requests, no unlocked-account transaction requests, and no impersonation calls. The production entry point's fixed-deployer guard is tested separately. These operational checks do not add external calls or privileges to the token or factory contracts.
 
-The full suite also verifies signature fields and domains, validity boundaries, callback acceptance, recipient restrictions, full uint256 supply handling, and standalone-interface parity. Compilation, all 144 tests, and TypeScript checks pass on Node.js 24.16.0 and npm 12.0.2. The 2026-11-21 automated checks passed with an empty `BSC_PRIVATE_KEY`. The separate [CREATE2 validation](../docs/CREATE2.md) reproduced the selected search result locally with `npm run deploy:local`, the pinned salt, and the asserted environment signing key while BSC RPC was unavailable; its output contained no signing key material. Missing-key rejection through the command was previously checked on 2026-11-13. All tests run on the local Cancun EVM; this review does not include a mainnet deployment or live BSC transactions.
+The full suite also verifies signature fields and domains, validity boundaries, callback acceptance, recipient restrictions, full uint256 supply handling, and standalone-interface parity. Compilation, all 146 tests, and TypeScript checks pass on Node.js 24.16.0 and npm 12.0.2. The 2026-11-21 automated checks passed with an empty `BSC_PRIVATE_KEY`. The separate [CREATE2 validation](../docs/CREATE2.md) reproduced the selected search result locally with `npm run deploy:local`, the pinned salt, and the asserted environment signing key while BSC RPC was unavailable; its output contained no signing key material. Missing-key rejection through the command was previously checked on 2026-11-13. All tests run on the local Cancun EVM; this review does not include a mainnet deployment or live BSC transactions.
 
 Reproduce the checks with:
 
@@ -99,8 +101,8 @@ aa6ecafdd985512064aa7603fd5c43eb4cabca9930e77eb1a3ca87597f3a6c39  contracts/mock
 e199c7911f9d0cb864d264bb82819f9e85bd7dbbf6b16626c69bbd343b63a9e6  test/Create2Factory.ts
 1bf10616e4938ee7b59e3b503b65fd5aac300e3246b7f1fc7b56732150d895c3  test/fixtures/token-create2.json
 6cf5a7c5eb888a190f3562a0cca1c5700b9c2ccabc62f5745ba20edad3109e08  scripts/deploy.ts
-738d115e54801c0b1fd34289b6546bfdf3d15fc3033d55178ab4e6af758d8bdd  scripts/lib/create2-deployment.ts
-7366a9c331593e1449b6ff8d725d7a69d57b9a6daf937c1ab22479e5b4db2ca6  test/Deployment.ts
+ca155ebc4339da233e8dd76cf436f44e36f125b96eb8e3e7243e7507a250694f  scripts/lib/create2-deployment.ts
+cb492962c3440e4b98ef717279e76845778362e4497aba373f4de9cc146f828c  test/Deployment.ts
 40bba94ae815c083f4fa3296cf83ac163fb41585b308b46a0614191fd6417bc6  package.json
 d9cb29a3bb3a7ee168ca52f2650e8ac7b47024f74bdc8c1206a01e475138efd6  package-lock.json
 5d9351182c35e27320797e322904cf80293e51a2fe1060b7d17677029a23e1fd  hardhat.config.ts
