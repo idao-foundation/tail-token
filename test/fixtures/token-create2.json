@@ -1,0 +1,8 @@
+{
+  "receiver": "0x631a52566152799DB3cffb5432F9d1d60Dc91c8d",
+  "totalSupply": "100000000000000000000000000",
+  "creationBytecodeBytes": 9952,
+  "initCodeBytes": 10016,
+  "creationBytecodeHash": "0x4a133737e29ab38e8d04e09bb176903866b40218b28b4afd4e1e24bd5abf306b",
+  "initCodeHash": "0xbcaaceb0c490365b2a3f3bebb7a4b2127bd30e11fb48a3f6132cc0e993abb0cc"
+}

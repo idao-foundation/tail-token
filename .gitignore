@@ -1,0 +1,15 @@
+node_modules/
+artifacts/
+cache/
+coverage/
+types/ethers-contracts/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.codex/
+.agents/
+.idea/
+.vscode/
+*.tsbuildinfo
