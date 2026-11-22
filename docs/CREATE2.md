@@ -4,6 +4,8 @@
 
 The factory accepts the existing search tool's `deploy(bytes32,bytes)` calldata. It uses the supplied salt and initialization code unchanged. Its owner is the account that creates the factory; ownership cannot be transferred or renounced. This authority controls factory deployments and grants no privileges over the deployed token.
 
+The [BSC mainnet deployment record](../deployments/bsc-mainnet/Token.json) is the unchanged JSON emitted by the successful deployment script. Its transaction receipts confirm factory creation at nonce zero and Token creation through CREATE2 at nonce one.
+
 ## Address and constructor inputs
 
 The search assumes the factory is deployed directly by the session wallet using ordinary `CREATE` at transaction nonce **zero**. That wallet and nonce determine the factory address. Factory bytecode is not an input to that address calculation. Creating it from another wallet, another nonce, or through another factory changes the address used by the search.

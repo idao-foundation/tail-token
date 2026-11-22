@@ -109,6 +109,8 @@ Known development-tool advisories remain open and are recorded in the [dependenc
 
 ## CREATE2 deployment
 
+The deployed BSC mainnet token is [`0xa11A111A3100DDe3224995982643CA592111AA11`](https://bscscan.com/address/0xa11A111A3100DDe3224995982643CA592111AA11#code). The [deployment record](deployments/bsc-mainnet/Token.json) preserves the original script output, including both transaction hashes, factory and token addresses, constructor inputs, CREATE2 salt, initialization-code hash, and gas limits/usage.
+
 [VanityCreate2Factory.sol](contracts/VanityCreate2Factory.sol) provides deployment at a searched address using an unmodified CREATE2 salt. Its immutable owner authorizes factory deployments and has no privileges over the token. The [CREATE2 deployment reference](docs/CREATE2.md) documents the factory ABI, wallet/nonce requirements, and verified initialization-code hash for 100 million TAIL with the specified mint receiver. The hash is covered by a regression test.
 
 The deployment script fixes the supply at **100,000,000 TAIL**, the receiver at `0x631a52566152799DB3cffb5432F9d1d60Dc91c8d`, and the deployer at the search session's public wallet address. It checks the exact `initCodeHash` before any deployment. The only variable deployment input is `CREATE2_SALT`: `0x` followed by the 64 hexadecimal digits produced by the search.
