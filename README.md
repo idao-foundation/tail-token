@@ -1,6 +1,10 @@
 # Longtail (TAIL)
 
+![Longtail token icon](assets/token/tail-128.png)
+
 A fixed-supply, non-upgradeable ERC-20 for **BNB Smart Chain mainnet only** (chain ID `56`), built with Solidity, Hardhat 3, ethers.js 6, and OpenZeppelin Contracts `5.6.1`.
+
+The [token artwork](assets/token/README.md) includes the original SVG, PNG exports, and a favicon for integrations.
 
 See the [Token ABI reference](docs/Token-ABI.md) for every read and write function, including overloads, parameters, return values, and signature rules.
 
