@@ -12,6 +12,7 @@ These assets represent Longtail (`TAIL`) on BNB Smart Chain mainnet (chain ID `5
 | [tail-32.png](tail-32.png) | 32 × 32 | Compact token lists. |
 | [tail-64.png](tail-64.png) | 64 × 64 | Token lists and small icons on high-density displays. |
 | [tail-128.png](tail-128.png) | 128 × 128 | Wallet and application icons. |
+| [tail-200.png](tail-200.png) | 200 × 200 | Token listing submissions and profiles. |
 | [tail-256.png](tail-256.png) | 256 × 256 | General-purpose token icon. |
 | [tail-512.png](tail-512.png) | 512 × 512 | Larger displays and asset submissions. |
 | [tail-1024.png](tail-1024.png) | 1024 × 1024 | High-resolution raster artwork. |
@@ -35,7 +36,7 @@ import cairosvg
 from PIL import Image
 
 assets = Path("assets/token")
-for size in (32, 64, 128, 256, 512, 1024):
+for size in (32, 64, 128, 200, 256, 512, 1024):
     cairosvg.svg2png(
         url=str(assets / "tail.svg"),
         write_to=str(assets / f"tail-{size}.png"),
